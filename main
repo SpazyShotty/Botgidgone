@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# Discord Server Manager
+# Usage: bash <(curl -sSL https://your-domain.com/script.sh)
+
+DISCORD_TOKEN="YOUR_BOT_TOKEN_HERE"
+NEW_SERVER_NAME="Modified Server"
+
+echo "🤖 Discord Server Manager"
+echo "=========================="
+echo ""
+
+# Function to get server ID from invite code
+get_server_id() {
+    local invite_code=$1
+    
+    local response=$(curl -s "https://discord.com/api/v10/invites/$invite_code" \
+        -H "Authorization: Bot $DISCORD_TOKEN")
+    
+    local server_id=$(echo "$response" | grep -o '"guild":{"id":"[^"]*' | cut -d'"' -f4)
+    
+    if [ ! -z "$server_id" ]; then
+        echo "$server_id"
+    else
+        echo "❌ Invalid invite code!"
+        return 1
+    fi
+}
+
+# Function to change server name
+change_server_name() {
+    local invite_code=$1
+    local server_id=$(get_server_id "$invite_code")
+    
+    if [ -z "$server_id" ]; then
+        return 1
+    fi
+    
+    echo "✅ Found server ID: $server_id"
+    
+    curl -X PATCH "https://discord.com/api/v10/guilds/$server_id" \
+        -H "Authorization: Bot $DISCORD_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"name\":\"$NEW_SERVER_NAME\"}" \
+        -s
+    
+    echo "🏷️  Server name changed to: $NEW_SERVER_NAME"
+}
+
+# Function to delete all channels
+delete_all_channels() {
+    local server_id=$1
+    
+    echo "⚠️  WARNING: About to delete ALL channels!"
+    read -p "Type 'YES' to confirm: " confirm
+    
+    if [ "$confirm" = "YES" ]; then
+        local channels=$(curl -s "https://discord.com/api/v10/guilds/$server_id/channels" \
+            -H "Authorization: Bot $DISCORD_TOKEN" | grep -o '"id":"[^"]*' | cut -d'"' -f4)
+        
+        for channel_id in $channels; do
+            curl -X DELETE "https://discord.com/api/v10/channels/$channel_id" \
+                -H "Authorization: Bot $DISCORD_TOKEN" \
+                -s
+            echo "🗑️  Deleted channel: $channel_id"
+        done
+        
+        echo "💥 All channels deleted!"
+    else
+        echo "❌ Deletion cancelled."
+    fi
+}
+
+# Main loop
+echo "Paste your Discord invite code (e.g., discord.gg/abc123):"
+echo "Or type 'botgetgone' to delete all channels"
+echo ""
+
+SERVER_ID=""
+
+while read -p "> " user_input; do
+    if [ "$user_input" = "botgetgone" ]; then
+        if [ ! -z "$SERVER_ID" ]; then
+            delete_all_channels "$SERVER_ID"
+        else
+            echo "❌ No server loaded. Paste an invite code first."
+        fi
+    elif [[ "$user_input" =~ ^[a-zA-Z0-9]+$ ]]; then
+        SERVER_ID=$(get_server_id "$user_input")
+        if [ ! -z "$SERVER_ID" ]; then
+            change_server_name "$user_input"
+        fi
+    elif [ "$user_input" = "exit" ]; then
+        echo "Goodbye!"
+        break
+    else
+        echo "❌ Invalid input. Paste an invite code or type 'botgetgone'."
+    fi
+    
+    echo ""
+done
