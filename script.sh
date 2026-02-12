@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Discord Server Manager
-# Usage: bash <(curl -sSL https://your-domain.com/script.sh)
 
 DISCORD_TOKEN="YOUR_BOT_TOKEN_HERE"
 NEW_SERVER_NAME="Modified Server"
